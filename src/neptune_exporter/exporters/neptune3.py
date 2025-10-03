@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import pyarrow as pa
-from typing import NewType, Optional, Sequence
+from typing import Generator, NewType, Optional, Sequence
 from pathlib import Path
 import neptune_query as nq
 from neptune_query import runs as nq_runs
@@ -54,7 +54,7 @@ class Neptune3Exporter:
 
     def list_projects(self) -> list[ProjectId]:
         raise NotImplementedError(
-            "Listing projects is not implemented in neptune 3 client, list project manually"
+            "Listing projects is not implemented in neptune 3 client, list projects manually"
         )
 
     def list_runs(
@@ -67,7 +67,7 @@ class Neptune3Exporter:
         project_id: ProjectId,
         run_ids: list[RunId],
         attributes: str | Sequence[str],
-    ) -> pa.RecordBatch:
+    ) -> Generator[pa.RecordBatch, None, None]:
         parameters_df = (
             nq_runs.fetch_runs_table(  # index="run", cols="attribute" (=path)
                 project=project_id,
@@ -78,14 +78,14 @@ class Neptune3Exporter:
                 type_suffix_in_column_names=True,
             )
         )
-        return pa.RecordBatch.from_pandas(parameters_df, schema=model.SCHEMA)
+        yield pa.RecordBatch.from_pandas(parameters_df, schema=model.SCHEMA)
 
     def download_metrics(
         self,
         project_id: ProjectId,
         run_ids: list[RunId],
         attributes: str | Sequence[str],
-    ) -> pa.RecordBatch:
+    ) -> Generator[pa.RecordBatch, None, None]:
         metrics_df = nq_runs.fetch_metrics(  # index=["run", "step"], column="path"
             project=project_id,
             runs=run_ids,
@@ -94,14 +94,14 @@ class Neptune3Exporter:
             lineage_to_the_root=False,
             type_suffix_in_column_names=True,
         )
-        return pa.RecordBatch.from_pandas(metrics_df, schema=model.SCHEMA)
+        yield pa.RecordBatch.from_pandas(metrics_df, schema=model.SCHEMA)
 
     def download_series(
         self,
         project_id: ProjectId,
         run_ids: list[RunId],
         attributes: str | Sequence[str],
-    ) -> pa.RecordBatch:
+    ) -> Generator[pa.RecordBatch, None, None]:
         series_df = nq_runs.fetch_series(  # index=["run", "step"], column="path"
             project=project_id,
             runs=run_ids,
@@ -110,15 +110,15 @@ class Neptune3Exporter:
             lineage_to_the_root=False,
             ype_suffix_in_column_names=True,
         )
-        return pa.RecordBatch.from_pandas(series_df, schema=model.SCHEMA)
+        yield pa.RecordBatch.from_pandas(series_df, schema=model.SCHEMA)
 
-    def download_artifacts(
+    def download_files(
         self,
         project_id: ProjectId,
         run_ids: list[RunId],
         attributes: str | Sequence[str],
         destination: Path,
-    ) -> pa.RecordBatch:
+    ) -> Generator[pa.RecordBatch, None, None]:
         files_df = nq_runs.fetch_runs_table(  # index="run", cols="attribute" (=path)
             project=project_id,
             runs=run_ids,
@@ -149,6 +149,6 @@ class Neptune3Exporter:
             )
         )
 
-        return pa.stack_batches(
+        yield pa.stack_batches(
             [file_paths_df, file_series_paths_df], schema=model.SCHEMA
         )
