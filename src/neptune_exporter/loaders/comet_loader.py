@@ -283,9 +283,6 @@ class CometLoader(DataLoader):
                             f"{series_step}; {timestamp}; {row['string_value']}\n"
                         )
                         tmp_file.write(text_line)
-                # Flush and close the file before passing to Comet
-                tmp_file.flush()
-                tmp_file.close()
 
                 # Upload to Comet - it will read the file synchronously
                 self._comet_experiment.log_asset(
