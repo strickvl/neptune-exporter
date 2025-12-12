@@ -202,31 +202,29 @@ All records use `src/neptune_exporter/model.py::SCHEMA`:
 
 ## Attribute/type mapping (detailed)
 
-The following table shows how Neptune attribute types are mapped to each target platform:
-
-| Neptune Type | MLflow | W&B | ZenML |
-|--------------|--------|-----|-------|
-| `float` | Param (stringified) | Config (native float) | Metadata (native float) |
-| `int` | Param (stringified) | Config (native int) | Metadata (native int) |
-| `string` | Param (stringified) | Config (native string) | Metadata (native string) |
-| `bool` | Param (stringified) | Config (native bool) | Metadata (native bool) |
-| `datetime` | Param (stringified) | Config (ISO string) | Metadata (ISO string) |
-| `string_set` | Param (comma-joined) | Config (list) | Metadata (list) |
-| `float_series` | Metrics (per-point, integer step) | Metrics (per-point, integer step) | Metadata summary (min/max/final/count) |
-| `string_series` | Text artifact (`series.txt`) | Text artifact (`series.txt`) | Not uploaded (metadata only) |
-| `histogram_series` | JSON artifact (`histograms.json`) | `wandb.Histogram` | Not uploaded (metadata only) |
-| `file` | Artifact (`log_artifact`) | Artifact (`wandb.Artifact`) | Artifact (`save_artifact`, linked to Model Version) |
-| `file_series` | Artifact with step in path | Artifact with step in name | Artifact (`save_artifact`, linked to Model Version) |
-| `file_set` | Artifact (directory) | Artifact (directory) | Artifact (`save_artifact`, linked to Model Version) |
-
-**Key differences:**
-
-- **Step handling**: MLflow and W&B require integer steps; use `--step-multiplier` to convert decimal Neptune steps. ZenML does not use steps since it aggregates series to summary statistics.
-- **Attribute name sanitization**:
-  - MLflow: Alphanumeric + `_-. /`, max 250 chars.
-  - W&B: Must match `^[_a-zA-Z][_a-zA-Z0-9]*$`; invalid chars become `_`.
-  - ZenML: Alphanumeric + `_-. /`, max 250 chars; paths are split into nested metadata for dashboard cards.
-- **Series data**: MLflow and W&B log each data point individually. ZenML computes min/max/final/count summaries since the Model Control Plane doesn't have native time-series charts.
+- **Parameters** (`float`, `int`, `string`, `bool`, `datetime`, `string_set`):
+  - MLflow: logged as params (values stringified by the client).
+  - W&B: logged as config with native types (string_set → list).
+  - ZenML: logged as nested metadata with native types (datetime → ISO string, string_set → list); paths are split for dashboard cards.
+- **Float series** (`float_series`):
+  - MLflow/W&B: logged as metrics using the integer step (`--step-multiplier` applied). Timestamps are forwarded when present.
+  - ZenML: aggregated into summary statistics (min/max/final/count) stored as metadata, since the Model Control Plane doesn't have native time-series visualization.
+- **String series** (`string_series`):
+  - MLflow: saved as artifacts (one text file per series).
+  - W&B: logged as a Table with columns `step`, `value`, `timestamp`.
+  - ZenML: not uploaded (skipped).
+- **Histogram series** (`histogram_series`):
+  - MLflow: uploaded as artifacts containing the histogram payload.
+  - W&B: logged as `wandb.Histogram`.
+  - ZenML: not uploaded (skipped).
+- **Files** (`file`) and **file series** (`file_series`):
+  - Downloaded to `--files-path/<sanitized_project_id>/...` with relative paths stored in `file_value.path`.
+  - MLflow/W&B: uploaded as artifacts. File series include the step in the artifact name/path so steps remain distinguishable.
+  - ZenML: uploaded via `save_artifact()` and linked to Model Versions.
+- **Attribute names**:
+  - MLflow: sanitized to allowed chars (alphanumeric + `_-. /`), truncated at 250 chars.
+  - W&B: sanitized to allowed pattern (`^[_a-zA-Z][_a-zA-Z0-9]*$`); invalid chars become `_`, and names are forced to start with a letter or underscore.
+  - ZenML: sanitized to allowed chars (alphanumeric + `_-. /` and spaces), max 250 chars; paths are split into nested metadata for dashboard card organization.
 
 For details on Neptune attribute types, see the [documentation](https://docs.neptune.ai/attribute_types).
 
